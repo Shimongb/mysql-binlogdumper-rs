@@ -1,5 +1,3 @@
-mod sql_queries;
-
 pub const BOOTSTRAP_SCHEMA: &str = r#"
 CREATE SEQUENCE IF NOT EXISTS seq_schema_changes;
 

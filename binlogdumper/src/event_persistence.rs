@@ -1,12 +1,13 @@
-mod event_persistence;
+use tokio::sync::mpsc;
 
-use serde::{Deserialize, Serialize};
+use crate::schema_update::TableSchema;
+use duckdb::{Connection, params};
+use mysql_binlogdumper_rs::event::event_data::EventData;
 use serde_json::Value;
 use std::collections::HashMap;
 
-
 #[derive(Clone)]
-struct EventPersistenceRequest {
+pub struct EventPersistenceRequest {
     schema_name: String,
     table_name: String,
     event_type: String,

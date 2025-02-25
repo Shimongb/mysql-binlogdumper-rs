@@ -1,8 +1,10 @@
-mod schema_update;
+use tokio::sync::mpsc;
 
+use duckdb::{Connection, Result, params};
+use mysql_async::prelude::*;
+use mysql_async::*;
+use mysql_binlogdumper_rs::event::table_map_event::TableMapEvent;
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
-
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct TableInfo {
@@ -16,16 +18,16 @@ pub struct TableInfo {
 }
 
 #[derive(Clone, Debug)]
-struct TableSchema {
-    column_types: Vec<u8>,
-    column_metas: Vec<u16>,
-    null_bits: Vec<bool>,
-    schema_version: String,
+pub struct TableSchema {
+    pub column_types: Vec<u8>,
+    pub column_metas: Vec<u16>,
+    pub null_bits: Vec<bool>,
+    pub schema_version: String,
 }
 
 // Create a channel type for async communication
 #[derive(Clone)]
-struct SchemaUpdateRequest {
+pub struct SchemaUpdateRequest {
     schema_name: String,
     table_name: String,
     schema_version: String,
@@ -33,6 +35,24 @@ struct SchemaUpdateRequest {
     column_types: Vec<u8>,
     column_meta: Vec<u16>,
     null_bits: Vec<bool>,
+}
+
+pub fn create_schema_update_request(
+    schema_name: &str,
+    table_name: &str,
+    schema_version: &str,
+    header_timestamp: u32,
+    event: &TableMapEvent,
+) -> SchemaUpdateRequest {
+    SchemaUpdateRequest {
+        schema_name: schema_name.to_string(),
+        table_name: table_name.to_string(),
+        schema_version: schema_version.to_string(),
+        binlog_timestamp: header_timestamp,
+        column_types: event.column_types.clone(),
+        column_meta: event.column_metas.clone(),
+        null_bits: event.null_bits.clone(),
+    }
 }
 
 pub async fn get_table_columns(
