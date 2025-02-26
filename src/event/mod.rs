@@ -1,5 +1,6 @@
 pub mod checksum_type;
 pub mod delete_rows_event;
+pub mod dml_event;
 pub mod event_data;
 pub mod event_header;
 pub mod event_type;

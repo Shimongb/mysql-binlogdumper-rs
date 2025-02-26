@@ -78,7 +78,7 @@ impl RowEvent {
         })
     }
 
-    pub fn to_json(&mut self) -> Value {
+    pub fn to_json(&self) -> Value {
         let mut json_object = serde_json::Map::new();
         for (i, column_value) in self.column_values.iter().enumerate() {
             let column_name = format!("COLUMN_{}", i + 1); // Adjust column naming as needed
@@ -124,11 +124,5 @@ impl RowEvent {
             json_object.insert(column_name, json_value);
         }
         Value::Object(json_object)
-    }
-
-    // Convenience method to store JSON representation
-    pub fn with_json(mut self) -> Self {
-        self.column_values_json = Some(self.to_json());
-        self
     }
 }

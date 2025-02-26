@@ -55,13 +55,13 @@ fn set_excluded_items(excluded_objects: String) -> Option<Vec<String>> {
 fn object_excluded(
     excluded_dbs: &Option<Vec<String>>,
     excluded_objects: &Option<Vec<String>>,
-    schema_name: &String,
-    table_name: &String,
+    schema_name: &str,
+    table_name: &str,
 ) -> bool {
     // Check if the current database is in the excluded list
     if excluded_dbs
         .as_ref()
-        .map_or(false, |excluded| excluded.contains(schema_name))
+        .map_or(false, |excluded| excluded.contains(&schema_name.to_string()))
     {
         return true;
     }
@@ -203,88 +203,36 @@ pub async fn dump_and_parse(
                     );
                 }
             }
-            EventData::WriteRows(write_event) => {
-                // Skip if database or object is excluded
-                if object_excluded(
-                    &excluded_dbs,
-                    &excluded_objects,
-                    &write_event.schema_name,
-                    &write_event.table_name,
-                ) {
-                    continue;
-                }
-
-                if let Err(e) = bl_tx
-                    .send(create_event_persistence_request(
-                        &write_event.schema_name,
-                        &write_event.table_name,
-                        "INSERT".to_string(),
-                        data.clone(),
-                        &current_binlog_file,
-                        &header.next_event_position,
-                        &header.timestamp,
-                        &schema_cache,
-                    ))
-                    .await
-                {
-                    eprintln!("Failed to send event persistence request: {}", e);
-                }
-            }
-            EventData::DeleteRows(delete_event) => {
-                // Skip if database or object is excluded
-                if object_excluded(
-                    &excluded_dbs,
-                    &excluded_objects,
-                    &delete_event.schema_name,
-                    &delete_event.table_name,
-                ) {
-                    continue;
-                }
-
-                if let Err(e) = bl_tx
-                    .send(create_event_persistence_request(
-                        &delete_event.schema_name,
-                        &delete_event.table_name,
-                        "DELETE".to_string(),
-                        data.clone(),
-                        &current_binlog_file,
-                        &header.next_event_position,
-                        &header.timestamp,
-                        &schema_cache,
-                    ))
-                    .await
-                {
-                    eprintln!("Failed to send event persistence request: {}", e);
-                }
-            }
-            EventData::UpdateRows(update_event) => {
-                // Skip if database or object is excluded
-                if object_excluded(
-                    &excluded_dbs,
-                    &excluded_objects,
-                    &update_event.schema_name,
-                    &update_event.table_name,
-                ) {
-                    continue;
-                }
-
-                if let Err(e) = bl_tx
-                    .send(create_event_persistence_request(
-                        &update_event.schema_name,
-                        &update_event.table_name,
-                        "UPDATE".to_string(),
-                        data.clone(),
-                        &current_binlog_file,
-                        &header.next_event_position,
-                        &header.timestamp,
-                        &schema_cache,
-                    ))
-                    .await
-                {
-                    eprintln!("Failed to send event persistence request: {}", e);
-                }
-            }
             _ => {}
+        }
+
+        // Handle DML events (WriteRows, UpdateRows, DeleteRows)
+        if let Some((dml_event, event_type)) = data.as_dml_event() {
+            // Skip if database or object is excluded
+            if object_excluded(
+                &excluded_dbs,
+                &excluded_objects,
+                dml_event.schema_name(),
+                dml_event.table_name(),
+            ) {
+                continue;
+            }
+
+            if let Err(e) = bl_tx
+                .send(create_event_persistence_request(
+                    dml_event.schema_name(),
+                    dml_event.table_name(),
+                    event_type,
+                    data.clone(),
+                    &current_binlog_file,
+                    &header.next_event_position,
+                    &header.timestamp,
+                    &schema_cache,
+                ))
+                .await
+            {
+                eprintln!("Failed to send event persistence request: {}", e);
+            }
         }
 
         // Check if we should stop processing

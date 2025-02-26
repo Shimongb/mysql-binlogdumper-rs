@@ -35,7 +35,7 @@ fn main() -> duckdb::Result<(), Box<dyn std::error::Error>> {
         false,
         "".to_string(),
         1001,
-        120,
+        60,
         "output_binlog_dir".to_string(),
     )?;
 

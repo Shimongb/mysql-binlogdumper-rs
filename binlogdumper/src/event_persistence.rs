@@ -3,7 +3,6 @@ use tokio::sync::mpsc;
 use crate::schema_update::TableSchema;
 use duckdb::{Connection, params};
 use mysql_binlogdumper_rs::event::event_data::EventData;
-use serde_json::Value;
 use std::collections::HashMap;
 
 #[derive(Clone)]
@@ -23,40 +22,15 @@ pub async fn event_persistence_worker(
     conn: Connection,
 ) {
     while let Some(req) = rx.recv().await {
-        // Persist the binlog event
-        let event_rows = match req.event_data {
-            EventData::WriteRows(write_event) => write_event
-                .rows
-                .clone()
-                .into_iter()
-                .map(|mut row| row.to_json())
-                .collect::<Vec<Value>>(),
-
-            EventData::DeleteRows(delete_event) => delete_event
-                .rows
-                .clone()
-                .into_iter()
-                .map(|mut row| row.to_json())
-                .collect::<Vec<Value>>(),
-
-            EventData::UpdateRows(update_event) => update_event
-                .rows
-                .clone()
-                .into_iter()
-                .map(|(mut before, mut after)| {
-                    Value::Object(
-                        [
-                            ("before".to_string(), before.to_json()),
-                            ("after".to_string(), after.to_json()),
-                        ]
-                        .into_iter()
-                        .collect(),
-                    )
-                })
-                .collect::<Vec<Value>>(),
-
-            _ => vec![],
+        // Get JSON representation of rows using the DmlEvent trait
+        let event_rows = if let Some((dml_event, _)) = req.event_data.as_dml_event() {
+            dml_event.rows_as_json()
+        } else {
+            // This shouldn't happen as we only send DML events to this worker
+            eprintln!("Received non-DML event in event_persistence_worker");
+            vec![]
         };
+
         if let Err(e) = conn.execute(
             r"
             INSERT INTO binlog_events (
