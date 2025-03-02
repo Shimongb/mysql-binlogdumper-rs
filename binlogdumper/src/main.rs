@@ -10,13 +10,13 @@ use mysql_async::{Opts, Pool};
 use runtime_db_utils::bootstrap_runtime_schema;
 
 fn main() -> duckdb::Result<(), Box<dyn std::error::Error>> {
-    let db_url = "mysql://root:963963xyz@127.0.0.1:3306".to_string();
+    let db_url: String = "mysql://root:963963xyz@127.0.0.1:3306".to_string();
 
     // Set up MySQL async connection pool
-    let opts = Opts::from_url(db_url.as_str())?;
+    let opts: Opts = Opts::from_url(&db_url)?;
 
     // Set up DuckDB connection for event storage
-    let conn = Connection::open_in_memory()?;
+    let conn: Connection = Connection::open_in_memory()?;
 
     let _ = bootstrap_runtime_schema(&conn);
 

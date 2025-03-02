@@ -2,7 +2,7 @@ use mysql_binlogdumper_rs::{binlog_client::BinlogClient, event::event_data::Even
 
 use crate::event_persistence::{create_event_persistence_request, event_persistence_worker};
 use crate::runtime_db_utils::handle_close;
-use crate::schema_update::{TableSchema, create_schema_update_request, schema_update_worker};
+use crate::schema_update::{create_schema_update_request, schema_update_worker, TableSchema};
 
 use duckdb::Connection;
 use mysql_async::Pool;
@@ -59,10 +59,9 @@ fn object_excluded(
     table_name: &str,
 ) -> bool {
     // Check if the current database is in the excluded list
-    if excluded_dbs
-        .as_ref()
-        .map_or(false, |excluded| excluded.contains(&schema_name.to_string()))
-    {
+    if excluded_dbs.as_ref().map_or(false, |excluded| {
+        excluded.contains(&schema_name.to_string())
+    }) {
         return true;
     }
 
@@ -97,13 +96,13 @@ pub async fn dump_and_parse(
 ) -> Result<String, Box<dyn std::error::Error>> {
     // Create a channel for schema updates
     let (tx, rx) = mpsc::channel(100); // Buffer size of 100
-    // Clone connection and spawn the bg worker
+                                       // Clone connection and spawn the bg worker
     let worker_conn = conn.try_clone()?;
     tokio::spawn(schema_update_worker(rx, pool.clone(), worker_conn));
 
     // Create a channel for event persistence
     let (bl_tx, bl_rx) = mpsc::channel(500); // Buffer size of 100
-    // Clone connection and spawn the bg worker
+                                             // Clone connection and spawn the bg worker
     tokio::spawn(event_persistence_worker(bl_rx, conn.try_clone().unwrap()));
 
     // Tracking variables
